@@ -6,12 +6,13 @@ import os
 
 hyperparameters = dict(
     num_features=12, num_epochs=1000, normalize=True,
-    debug=True, latent_vector_size=100,
-    batch_size=1000, ns_param=0.0, adpt_l=0,
-    res_depth=1, dr_param=1, batch_param=0.0,
-    display_step=10, learning_rate=0.001,
-    reg_param=0.01
+    debug=True, latent_vector_size=9,
+    batch_size=1000, ns_param=0.5, adpt_l=0,
+    res_depth=1, dr_param=1, batch_param=1e-2,
+    display_step=10, d_learning_rate=1e-3,
+    reg_param=1e-3, g_learning_rate=1e-4
 )
+
 
 model = models.gan.GAN(**hyperparameters)
 
@@ -29,20 +30,22 @@ def get_summary(data):
     return out
 
 
-dirs = [el for el in os.listdir('results/gan') if 'trial_' in el]
+dirs = [el for el in os.listdir('results') if 'trial_' in el]
 trials = [int(el.split('_')[1]) for el in dirs]
 trials.insert(0, -1)
 trial = np.max(trials) + 1
 print('Trial number: ' + str(trial))
-os.mkdir('results/gan/trial_{}'.format(trial))
+os.mkdir('results/trial_{}'.format(trial))
 
-exploits = ['freak', 'nginx_keyleak', 'nginx_rootdir']
+exploits = ['multi_encrypt', 'freak', 'nginx_keyleak', 'nginx_rootdir']
 summaries = {'hyperparameters': hyperparameters}
+raw_data = []
 
 for exploit in exploits:
     data = []
 
     for i in range(5):
+
         trX, trY = fops.load_data(
             (
                 './data/three-step/{}/subset_{}/train_set.csv'
@@ -58,12 +61,19 @@ for exploit in exploits:
                 ).format(exploit, i)
             )
 
-            data.append(model.test(teX, teY))
+            d = model.test(teX, teY)
+            data.append(d)
+            raw_data.append(d)
 
     summaries[exploit] = get_summary(data)
 
-    with open('results/gan/trial_{}/{}.json'.format(trial, exploit), 'w') as f:
+    with open('results/trial_{}/{}.json'.format(trial, exploit), 'w') as f:
         json.dump(data, f, indent=2)
 
-with open('results/gan/trial_{}/summary.json'.format(trial), 'w') as f:
+
+summaries['net'] = get_summary(raw_data)
+
+with open('results/trial_{}/summary.json'.format(trial), 'w') as f:
     json.dump(summaries, f, indent=2)
+
+print('Output in results/trial_{}'.format(trial))

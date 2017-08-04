@@ -23,7 +23,7 @@ class GAN:
         batch_size (int = 100): Batch size.
         num_epochs (int = 10): Number of training epochs.
         debug (bool = False): Flag to print output.
-        normalize (bool = False): Flag to determine if data
+        normalize (bool = True): Flag to determine if data
             is normalized.
         display_step (int = 1): How often to debug epoch data
             during training.
@@ -37,6 +37,7 @@ class GAN:
         res_depth (int = 1): Number of residual blocks per layer.
         learning_rate (float = 0.001): Learning rate.
         reg_param (float = 0.01): L2 Regularization parameter.
+        normalize_vector (bool = False) = Flag to normalize feature vector.
     """
 
     def __init__(self, num_features, **kwargs):
@@ -54,8 +55,10 @@ class GAN:
             'batch_param': 0.1,
             'dr_param': 1.,
             'df_param': 1.,
-            'learning_rate': .001,
-            'reg_param': 0.01
+            'd_learning_rate': .001,
+            'g_learning_rate': .001,
+            'reg_param': 0.01,
+            'normalize_vector': False
         }
 
         self.num_features = num_features
@@ -99,43 +102,81 @@ class GAN:
 
         self.embedding_ops = []
 
-        def build_net(X, sizes):
+        # def build_net(X, sizes):
+        #     lrelu = nn.lrelu_gen(0.1)
+
+        #     def block(x, in_dim, out_dim, i):
+        #         with tf.variable_scope('block_{}'.format(i)):
+        #             z = x
+        #             for j in range(self.res_depth):
+        #                 with tf.variable_scope('res_block_{}'.format(j)):
+        #                     z = nn.build_residual_block(
+        #                         z, lrelu, in_dim, self.reg_param
+        #                     )
+        #                     with tf.variable_scope('residual_block'):
+        #                         self.embedding_ops.append(z)
+        #                     z = tf.nn.dropout(z, self.keep_prob)
+
+        #             z = nn.build_fc_layer(
+        #                 z, lrelu, in_dim, out_dim, self.reg_param
+        #             )
+
+        #             with tf.variable_scope('fc_block'):
+        #                 self.embedding_ops.append(z)
+
+        #             if i < len(sizes) - 2:
+        #                 z = tf.nn.dropout(z, self.keep_prob)
+
+        #             return z
+        #     z = X
+
+        #     for i in range(1, len(sizes)):
+        #         z = block(z, sizes[i-1], sizes[i], i-1)
+
+        #     return z
+
+        def build_net(x, sizes):
             lrelu = nn.lrelu_gen(0.1)
+            sizes = [[sizes[i], sizes[i+1]] for i in range(len(sizes)-1)]
 
-            def block(x, in_dim, out_dim, i):
-                with tf.variable_scope('block_{}'.format(i)):
-                    z = x
-                    for j in range(self.res_depth):
-                        with tf.variable_scope('res_block_{}'.format(j)):
-                            z = nn.build_residual_block(
-                                z, lrelu, in_dim, self.reg_param
-                            )
-                            with tf.variable_scope('residual_block'):
-                                self.embedding_ops.append(z)
-                            z = tf.nn.dropout(z, self.keep_prob)
+            def build_block(x, _in, _out):
+                z = x
 
-                    z = nn.build_fc_layer(
-                        z, lrelu, in_dim, out_dim, self.reg_param
-                    )
+                for i in range(self.res_depth):
+                    with tf.variable_scope('fc_layer_{}'.format(i)):
+                        f = tf.nn.dropout(
+                            nn.build_fc_layer(
+                                z, lrelu, _in, _in, self.reg_param
+                            ),
+                            self.keep_prob
+                        )
 
-                    with tf.variable_scope('fc_block'):
-                        self.embedding_ops.append(z)
+                        z = f + z
 
-                    if i < len(sizes) - 2:
-                        z = tf.nn.dropout(z, self.keep_prob)
+                return tf.nn.dropout(
+                    nn.build_fc_layer(
+                        z, lrelu, _in, _out, self.reg_param
+                    ),
+                    self.keep_prob
+                )
 
-                    return z
-            z = X
+            z = x
+            i = 0
 
-            for i in range(1, len(sizes)):
-                z = block(z, sizes[i-1], sizes[i], i-1)
+            for _in, _out in sizes:
+                with tf.variable_scope('res_block_{}'.format(i)):
+                    z = build_block(z, _in, _out)
+                    i += 1
 
             return z
 
         vec_size = self.num_features * self.num_steps
 
         g_sizes = [self.latent_vector_size, 100, vec_size]
-        d_sizes = [vec_size, 64, 32, 16, 8, 4, 2]
+        d_sizes = [vec_size, 18, 9, 3, 2]
+
+        # g_sizes = [self.latent_vector_size, vec_size]
+        # d_sizes = [vec_size, 18, 9, 3, 2]
 
         with tf.variable_scope('generator'):
             G_sample = tf.nn.tanh(build_net(self.Z, g_sizes))
@@ -234,7 +275,7 @@ class GAN:
         ))
 
         # Optimizers
-        self.D_solver = tf.train.AdamOptimizer(0.001).minimize(
+        self.D_solver = tf.train.AdamOptimizer(self.d_learning_rate).minimize(
             self.D_loss,
             var_list=tf.get_collection(
                 tf.GraphKeys.TRAINABLE_VARIABLES,
@@ -242,7 +283,7 @@ class GAN:
             )
         )
 
-        self.G_solver = tf.train.AdamOptimizer(0.0001).minimize(
+        self.G_solver = tf.train.AdamOptimizer(self.g_learning_rate).minimize(
             self.G_loss,
             var_list=tf.get_collection(
                 tf.GraphKeys.TRAINABLE_VARIABLES,

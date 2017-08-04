@@ -7,13 +7,15 @@ model = models.gan.GAN(
     debug=True, latent_vector_size=100,
     batch_size=1000, ns_param=0., adpt_l=0,
     res_depth=1, dr_param=1, batch_param=0.,
-    display_step=10, learning_rate=0.001,
+    display_step=10, learning_rate=0.005,
     reg_param=0.01
 )
 
-# exploit = 'freak'
+print('hola')
+
+exploit = 'freak'
 # exploit = 'nginx_keyleak'
-exploit = 'nginx_rootdir'
+# exploit = 'nginx_rootdir'
 
 data = []
 
@@ -35,5 +37,5 @@ for i in range(5):
 
         data.append(model.test(teX, teY))
 
-with open('results/gan/{}.json'.format(exploit), 'w') as f:
+with open('results/{}.json'.format(exploit), 'w') as f:
     json.dump(data, f, indent=2)
