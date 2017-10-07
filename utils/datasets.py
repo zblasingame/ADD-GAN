@@ -89,7 +89,7 @@ def random_batcher(data, batch_size=100):
         yield [el[batch_start:] for el in data]
 
 
-def rescaling(data, _min, _max, start=0.0, end=1.0, axis=0):
+def rescale(data, _min, _max, start=0.0, end=1.0, axis=0):
     """Rescale features of a dataset
 
     args:

@@ -10,7 +10,7 @@ import tensorflow as tf
 import json
 import csv
 
-import utils.file_ops as fops
+import utils.datasets as ds
 import models.nnblocks as nn
 import utils.tensorboard as tb
 
@@ -23,8 +23,8 @@ class GAN:
         batch_size (int = 100): Batch size.
         num_epochs (int = 10): Number of training epochs.
         debug (bool = False): Flag to print output.
-        normalize (bool = True): Flag to determine if data
-            is normalized.
+        normalize (str = 'rescaling'): Normalization mode
+            from the set {'rescaling', 'vector_norm', 'none'}
         display_step (int = 1): How often to debug epoch data
             during training.
         num_steps (int = 3): Number of time steps.
@@ -37,7 +37,6 @@ class GAN:
         res_depth (int = 1): Number of residual blocks per layer.
         learning_rate (float = 0.001): Learning rate.
         reg_param (float = 0.01): L2 Regularization parameter.
-        normalize_vector (bool = False) = Flag to normalize feature vector.
     """
 
     def __init__(self, num_features, **kwargs):
@@ -47,7 +46,7 @@ class GAN:
             'batch_size': 100,
             'num_steps': 3,
             'debug': False,
-            'normalize': True,
+            'normalize': 'rescaling',
             'latent_vector_size': 100,
             'adpt_l': 2.0,
             'res_depth': 1,
@@ -58,7 +57,7 @@ class GAN:
             'd_learning_rate': .001,
             'g_learning_rate': .001,
             'reg_param': 0.01,
-            'normalize_vector': False
+            'vector_norm': False
         }
 
         self.num_features = num_features
@@ -337,10 +336,13 @@ class GAN:
         training_size = X.shape[0]
 
         # normalize X
-        if self.normalize:
+        if self.normalize == 'rescaling':
             _min = X.min(axis=0)
             _max = X.max(axis=0)
-            X = fops.normalize(X, _min, _max, -1, 1)
+            X = ds.rescale(X, _min, _max, -1, 1)
+
+        elif self.normalize == 'vector_norm':
+            X = ds.vector_norm(X, -1, 1)
 
         assert self.batch_size < training_size, (
             'batch size is larger than training_size'
@@ -357,7 +359,7 @@ class GAN:
 
             prev_diff_loss = 0
 
-            batch = fops.random_batcher([X, Y], self.batch_size)
+            batch = ds.random_batcher([X, Y], self.batch_size)
 
             count = 0
 
@@ -422,7 +424,7 @@ class GAN:
                     self.print(display_str)
 
             # assign normalization values
-            if self.normalize:
+            if self.normalize == 'rescaling':
                 sess.run(self.feature_min.assign(_min))
                 sess.run(self.feature_max.assign(_max))
 
@@ -448,11 +450,13 @@ class GAN:
             self.saver.restore(sess, './model.ckpt')
 
             # normalize data
-            if self.normalize:
+            if self.normalize == 'rescaling':
                 _min = self.feature_min.eval()
                 _max = self.feature_max.eval()
+                X = ds.rescale(X, _min, _max, -1, 1)
 
-                X = fops.normalize(X, _min, _max, -1, 1)
+            elif self.normalize == 'vector_norm':
+                X = ds.vector_norm(X, -1, 1)
 
             labels, acc, mat, d_loss, g_loss = sess.run(
                 [self.scores, self.accuracy, self.confusion_matrix,

@@ -1,4 +1,4 @@
-import utils.file_ops as fops
+import utils.datasets as ds
 import models.gan
 import json
 import numpy as np
@@ -9,8 +9,8 @@ import plotly.graph_objs as go
 import plotly.figure_factory as ff
 
 hyperparameters = dict(
-    num_features=12, num_epochs=1000, normalize=True,
-    debug=True, latent_vector_size=72,
+    num_features=12, num_epochs=2000, normalize='rescaling',
+    debug=True, latent_vector_size=100,
     batch_size=1000, ns_param=.5, adpt_l=0,
     res_depth=1, dr_param=1, batch_param=1e-2,
     display_step=10, d_learning_rate=1e-3,
@@ -39,7 +39,11 @@ loc = 'results/{}'.format(loc_name)
 if not os.path.exists(loc):
     os.mkdir(loc)
 
-exploits = ['freak', 'nginx_keyleak', 'nginx_rootdir', 'caleb']
+# exploits = ['freak', 'nginx_keyleak', 'nginx_rootdir', 'caleb']
+exploits = [
+    'freak', 'poodle', 'nginx_keyleak', 'nginx_rootdir', 'logjam',
+    'orzhttpd_rootdir', 'orzhttpd_restore'
+]
 
 summaries = {'hyperparameters': hyperparameters}
 raw_data = []
@@ -51,18 +55,18 @@ for exploit in exploits:
     data = []
 
     for i in range(5):
-        trX, trY = fops.load_data(
+        trX, trY = ds.load_data(
             (
-                './data/three-step/{}/subset_{}/train_set.csv'
+                './data/ndss/ts/{}/subset_{}/train_set.csv'
             ).format(exploit, i)
         )
 
         model.train(trX, trY)
 
         for j in range(5):
-            teX, teY = fops.load_data(
+            teX, teY = ds.load_data(
                 (
-                    './data/three-step/{}/subset_{}/test_set.csv'
+                    './data/ndss/ts/{}/subset_{}/test_set.csv'
                 ).format(exploit, j)
             )
 
