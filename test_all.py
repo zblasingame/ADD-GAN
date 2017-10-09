@@ -1,4 +1,4 @@
-import utils.file_ops as fops
+import utils.datasets as ds
 import models.gan
 import json
 import numpy as np
@@ -46,7 +46,7 @@ for exploit in exploits:
 
     for i in range(5):
 
-        trX, trY = fops.load_data(
+        trX, trY = ds.load_data(
             (
                 './data/three-step/{}/subset_{}/train_set.csv'
             ).format(exploit, i)
@@ -55,7 +55,7 @@ for exploit in exploits:
         model.train(trX, trY)
 
         for i in range(5):
-            teX, teY = fops.load_data(
+            teX, teY = ds.load_data(
                 (
                     './data/three-step/{}/subset_{}/test_set.csv'
                 ).format(exploit, i)
